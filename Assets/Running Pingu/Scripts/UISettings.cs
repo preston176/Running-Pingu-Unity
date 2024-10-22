@@ -60,6 +60,8 @@ public class UISettings : UIWindow
     public void LoadVolume()
     {
         var savedMasterVolume = Mathf.Clamp(PlayerPrefs.GetFloat(PREF_MASTER_VOLUME, defaultMasterVolume), 0.001f, 1f);
+        var savedMusicVolume = Mathf.Clamp(PlayerPrefs.GetFloat(PREF_MUSIC_VOLUME, defaultMusicVolume), 0.001f, 1f);
         masterSlider.value = savedMasterVolume;
+        musicSlider.value = savedMusicVolume;
     }
 }
