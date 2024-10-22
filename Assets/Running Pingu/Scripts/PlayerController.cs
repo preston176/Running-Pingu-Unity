@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 
+/* These are enum declarations in C#. */
 public enum MovementDirection
 {
     Left,
@@ -304,6 +305,10 @@ public class PlayerController : MonoBehaviour
         trail.emitting = MovementState is MovementState.Airborne or MovementState.Sliding;
     }
 
+/// <summary>
+/// The UpdateAnimations function updates the animation states of the player based on the movement and
+/// grounded states.
+/// </summary>
     private void UpdateAnimations()
     {
         player.anim.SetBool(ANIM_RUNNING, movementState == MovementState.Running);
@@ -311,6 +316,16 @@ public class PlayerController : MonoBehaviour
         player.anim.SetBool(ANIM_GROUNDED, isGrounded);
     }    
 
+/// <summary>
+/// The GroundedRaycast function checks for ground contact using a downward raycast from the player's
+/// position.
+/// </summary>
+/// <returns>
+/// The `GroundedRaycast` method is returning the result of a Physics.Raycast operation. This operation
+/// casts a ray from a specified origin point (just below the center of the controller's bounds) in the
+/// downward direction (Vector3.down) and checks for collisions with objects on the `groundedLayerMask`
+/// layer within a distance of `groundedRayOffsetY + groundedRayTreshold`. The
+/// </returns>
     private bool GroundedRaycast()
     {
         Ray groundRay = new(
