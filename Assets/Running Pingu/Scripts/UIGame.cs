@@ -11,12 +11,12 @@ public class UIGame : MonoBehaviour
 
     private void Update()
     {
-        var isPlaying = GameManager.instance.GameState == GameState.Playing;
+        var isPlaying = GameManager.Instance.GameState == GameState.Playing;
         if (isPlaying)
         {
-            scoreText.text = GameManager.instance.Score.ToString();
-            coinsText.text = GameManager.instance.CoinsScore.ToString();
-            modifierText.text = $"x{GameManager.instance.DifficultyModifier:N1}";
+            scoreText.text = GameManager.Instance.SessionScore.ToString();
+            coinsText.text = GameManager.Instance.SessionCoinsScore.ToString();
+            modifierText.text = $"x{GameManager.Instance.DifficultyModifier:N1}";
 
             panel.SetActive(true);
         }

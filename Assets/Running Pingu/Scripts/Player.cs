@@ -13,8 +13,13 @@ public class Player : MonoBehaviour
     public const string ANIM_IDLE = "Idle";
 
     [Header("References")]
-    [SerializeField] private Animator anim;
+    public Animator defaultAnimator;
+    public Animator anim;
     [field:SerializeField] public PlayerController Controller { get; private set; }
+    [field:SerializeField] public PlayerSkinController SkinController { get; private set; }
+
+    [Header("Sounds")]
+    [SerializeField] private AudioClip crashSound;
 
     private PlayerState playerState = PlayerState.Idle;
     private Vector3 startPosition;
@@ -22,16 +27,19 @@ public class Player : MonoBehaviour
 
     public PlayerState State => playerState;
 
-    public static Player instance;
+    public static Player Instance;
 
     private void Awake()
     {
-        instance = this;
+        Instance = this;
+
+        startPosition = transform.position;
     }
 
     private void Start()
     {
-        startPosition = transform.position;
+        if (anim == null)
+            anim = defaultAnimator;
     }
 
     private void Update()
@@ -58,7 +66,10 @@ public class Player : MonoBehaviour
         playerState = PlayerState.Dead;
         Controller.StopRunning();
 
-        GameManager.instance.GameOver();
+        // play crash sound
+        AudioManager.Instance.PlaySound2DOneShot(crashSound);
+
+        GameManager.Instance.GameOver();
     }
 
     public void TeleportToStart()

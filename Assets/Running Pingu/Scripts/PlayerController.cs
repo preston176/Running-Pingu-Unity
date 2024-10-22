@@ -18,19 +18,26 @@ public enum MovementState
 public class PlayerController : MonoBehaviour
 {
     private const float LANE_DISTANCE = 3.0f;
-    private const string ANIM_GROUNDED = "IsGrounded";
-    private const string ANIM_RUNNING = "Running";
-    private const string ANIM_SLIDING = "Sliding";
-    private const string ANIM_JUMP = "Jump";
+    private static readonly int ANIM_GROUNDED = Animator.StringToHash("IsGrounded");
+    private static readonly int ANIM_RUNNING = Animator.StringToHash("Running");
+    private static readonly int ANIM_SLIDING = Animator.StringToHash("Sliding");
+    private static readonly int ANIM_JUMP = Animator.StringToHash("Jump");
 
     [Header("References")]
     [SerializeField] private Player player;
     [SerializeField] private CharacterController controller;
-    [SerializeField] private Animator anim;
+    [SerializeField] private TrailRenderer trail;
 
     [Header("Settings")]
     [SerializeField] private float gravity = 12f;
     [SerializeField] private float lookRotationDuration = 0.05f;
+
+    [Header("Sounds")]
+    [SerializeField] private AudioSource slideSource;
+    [SerializeField] private AudioClip swipeSound;
+    [SerializeField] private AudioClip jumpSound;
+    [SerializeField] private float swipePitchVariation = 0.1f;
+    [SerializeField] private float slidePitchVariation = 0.1f;
 
     [Header("Speed")]
     [SerializeField] private float baseSpeed = 7f;
@@ -96,7 +103,7 @@ public class PlayerController : MonoBehaviour
             return;
 
         // calculate speed
-        speed = baseSpeed * GameManager.instance.DifficultyModifier;
+        speed = baseSpeed * GameManager.Instance.DifficultyModifier;
 
         // check grounded state
         wasGroundedLastFrame = isGrounded;
@@ -105,6 +112,7 @@ public class PlayerController : MonoBehaviour
         HandleInput();
         Move();
         HandleRotation();
+        HandleTrailDisplay();
 
         UpdateAnimations();
     }
@@ -112,22 +120,34 @@ public class PlayerController : MonoBehaviour
     private void HandleInput()
     {
         // handle player input for switching lanes
-        if (MobileInput.instance.SwipeLeft)
+        if (MobileInput.Instance.SwipeLeft)
         {
+            // play swipe sfx
+            AudioManager.Instance.PlaySound2DOneShot(swipeSound, pitchVariation: swipePitchVariation);
+
+            // move towards left lane
             MoveLane(MovementDirection.Left);
-            Debug.Log("Moving left");
         }
-        else if (MobileInput.instance.SwipeRight)
+        else if (MobileInput.Instance.SwipeRight)
         {
+            // play swipe sfx
+            AudioManager.Instance.PlaySound2DOneShot(swipeSound, pitchVariation: swipePitchVariation);
+
+            // move towards right lane
             MoveLane(MovementDirection.Right);
-            Debug.Log("Moving right");
+        }
+
+        // we landed
+        if (!wasGroundedLastFrame && isGrounded)
+        {
+            Land();
         }
 
         // we're on the ground
         if (isGrounded)
         {
             // detected jump input
-            if (MobileInput.instance.SwipeUp)
+            if (MobileInput.Instance.SwipeUp)
             {
                 // if we were sliding cancel the slide?
                 if (movementState == MovementState.Sliding)
@@ -136,11 +156,13 @@ public class PlayerController : MonoBehaviour
                 Jump();
             }
             // detected slide input
-            else if (MobileInput.instance.SwipeDown)
+            else if (MobileInput.Instance.SwipeDown)
             {
                 // only slide if we're not already sliding
                 if (movementState != MovementState.Sliding)
                 {
+                    if (slideRoutine != null)
+                        StopCoroutine(slideRoutine);
                     slideRoutine = StartCoroutine(Slide());
                 }
             }
@@ -149,15 +171,10 @@ public class PlayerController : MonoBehaviour
         else
         {
             // fast falling mechanic
-            if (MobileInput.instance.SwipeDown)
+            if (MobileInput.Instance.SwipeDown)
             {
                 FastFall();
             }
-        }
-
-        if (!wasGroundedLastFrame && isGrounded)
-        {
-            Land();
         }
     }
 
@@ -167,22 +184,20 @@ public class PlayerController : MonoBehaviour
         movementState = MovementState.Airborne;
         verticalVelocity = jumpForce;
 
-        anim.SetTrigger(ANIM_JUMP);
+        player.anim.SetTrigger(ANIM_JUMP);
 
-        Debug.Log("Jump");
+        // play jump sound
+        AudioManager.Instance.PlaySound2DOneShot(jumpSound, pitchVariation: 0.1f);
     }
 
     private void FastFall()
     {
         verticalVelocity = -jumpForce;
-        Debug.Log("Fast Fall");
     }
 
     private void Land()
     {
         movementState = MovementState.Running;
-
-        Debug.Log("Landed");
     }
 
     private IEnumerator Slide()
@@ -199,13 +214,16 @@ public class PlayerController : MonoBehaviour
         SetRegularHitbox();
         SetSlidingHitbox();
 
-        Debug.Log("Slide");
+        // randomize slide pitch
+        slideSource.pitch = Random.Range(1 - slidePitchVariation, 1 + slidePitchVariation);
+        // enable sliding sfx
+        slideSource.Play();
     }
 
     private void SetSlidingHitbox()
     {
-        controller.height /= 2;
-        controller.center = new Vector3(controller.center.x, controller.center.y / 2, controller.center.z);
+        controller.height *= slideHitboxMutliplier;
+        controller.center = new Vector3(controller.center.x, controller.center.y * slideHitboxMutliplier, controller.center.z);
     }
     private void SetRegularHitbox()
     {
@@ -228,6 +246,9 @@ public class PlayerController : MonoBehaviour
 
         // set the collider back to original size
         SetRegularHitbox();
+
+        // disable sliding sfx
+        slideSource.Stop();
     }
 
     private void Move()
@@ -278,11 +299,16 @@ public class PlayerController : MonoBehaviour
         }
     }
 
+    private void HandleTrailDisplay()
+    {
+        trail.emitting = MovementState is MovementState.Airborne or MovementState.Sliding;
+    }
+
     private void UpdateAnimations()
     {
-        anim.SetBool(ANIM_RUNNING, movementState == MovementState.Running);
-        anim.SetBool(ANIM_SLIDING, movementState == MovementState.Sliding);
-        anim.SetBool(ANIM_GROUNDED, isGrounded);
+        player.anim.SetBool(ANIM_RUNNING, movementState == MovementState.Running);
+        player.anim.SetBool(ANIM_SLIDING, movementState == MovementState.Sliding);
+        player.anim.SetBool(ANIM_GROUNDED, isGrounded);
     }    
 
     private bool GroundedRaycast()
@@ -303,6 +329,7 @@ public class PlayerController : MonoBehaviour
         desiredLane = Mathf.Clamp(desiredLane, 0, 2);
     }
 
+    //private void OnCollisionEnter(Collision hit)
     private void OnControllerColliderHit(ControllerColliderHit hit)
     {
         // only detect collision when running
@@ -320,8 +347,16 @@ public class PlayerController : MonoBehaviour
     private void OnTriggerEnter(Collider other)
     {
         // only detect when running
-        if (Player.instance.State != PlayerState.Running)
+        if (Player.Instance.State != PlayerState.Running)
             return;
+
+        // hit an obstacle
+        if (other.gameObject.CompareTag("Obstacle"))
+        {
+            // make the player crash and trigger game over
+            player.Crash();
+            return;
+        }
 
         // entered a pickup
         var pickup = other.GetComponentInParent<Pickup>();
